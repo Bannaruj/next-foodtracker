@@ -45,6 +45,7 @@ interface FoodItem {
  * @param params - รับ `id` ของอาหารจาก URL
  */
 export default function EditFoodPage({ params }: { params: { id: string } }) {
+  const { id } = params;
   const router = useRouter();
   const [foodItem, setFoodItem] = useState<FoodItem | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
