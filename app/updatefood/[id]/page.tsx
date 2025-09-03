@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react"; // 1. เพิ่มการ import 'use'
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 
-// --- Mock Data: ในแอปจริง, ข้อมูลนี้ควรจะมาจากแหล่งเดียวกันกับหน้า Dashboard ---
-// --- เพื่อให้สามารถค้นหา ID ที่ตรงกันเจอ ---
+// --- Mock Data ---
 const mockFoodData = [
   {
     id: 1,
@@ -31,41 +30,43 @@ const mockFoodData = [
   },
 ];
 
-// --- สร้าง Type Definition เพื่อความชัดเจนในการใช้ TypeScript ---
+// --- Type Definitions ---
 interface FoodItem {
   id: number;
   date: string;
   name: string;
-  meal: "Breakfast" | "Lunch" | "Dinner" | "Snack" | string; // ยืดหยุ่นให้เป็น string ได้
+  meal: "Breakfast" | "Lunch" | "Dinner" | "Snack" | string;
   imageUrl: string;
 }
 
-/**
- * หน้าสำหรับแก้ไขข้อมูลอาหาร
- * @param params - รับ `id` ของอาหารจาก URL
- */
-export default function EditFoodPage({ params }: { params: { id: string } }) {
-  const { id } = params;
+// 2. แก้ไข Type ของ Props ให้ params เป็น Promise
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
+
+export default function EditFoodPage({ params }: PageProps) {
+  // 3. ใช้ use hook เพื่อดึงค่า id ออกมาจาก Promise
+  const { id } = use(params);
   const router = useRouter();
   const [foodItem, setFoodItem] = useState<FoodItem | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
-  // useEffect จะทำงานเมื่อ component ถูกโหลด, เพื่อดึงข้อมูลอาหารที่ต้องการแก้ไข
   useEffect(() => {
-    const foodId = parseInt(params.id, 10);
+    // 4. ใช้ 'id' ที่ได้จาก use hook
+    const foodId = parseInt(id, 10);
     const itemToEdit = mockFoodData.find((item) => item.id === foodId);
 
     if (itemToEdit) {
       setFoodItem(itemToEdit);
       setImagePreview(itemToEdit.imageUrl);
     } else {
-      // หากไม่พบ ID ของอาหาร, ให้ redirect กลับไปหน้า dashboard
       alert("Food item not found!");
       router.push("/dashboard");
     }
-  }, [params.id, router]);
+  }, [id, router]); // 5. แก้ไข dependency array เป็น id
 
-  // Handler สำหรับอัปเดต state เมื่อมีการเปลี่ยนแปลงใน input fields
+  // ... (ส่วนที่เหลือของโค้ดเหมือนเดิม ไม่ต้องแก้ไข) ...
+
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
@@ -74,7 +75,6 @@ export default function EditFoodPage({ params }: { params: { id: string } }) {
     setFoodItem((prev) => (prev ? { ...prev, [name]: value } : null));
   };
 
-  // Handler สำหรับการเลือกรูปภาพและแสดง preview
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -86,10 +86,8 @@ export default function EditFoodPage({ params }: { params: { id: string } }) {
     }
   };
 
-  // Handler สำหรับการ submit ฟอร์ม
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    // เพิ่ม Logic สำหรับส่งข้อมูลที่แก้ไขแล้วไปอัปเดตที่ API ของคุณ
     console.log("Saving updated food item:", {
       ...foodItem,
       newImage: imagePreview,
@@ -98,7 +96,6 @@ export default function EditFoodPage({ params }: { params: { id: string } }) {
     router.push("/dashboard");
   };
 
-  // แสดงสถานะ Loading ขณะที่กำลังดึงข้อมูล
   if (!foodItem) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
