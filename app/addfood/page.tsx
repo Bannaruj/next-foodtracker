@@ -9,7 +9,6 @@ import Image from "next/image";
 export default function AddFoodPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
-  // ตั้งค่าวันที่เริ่มต้นเป็นวันปัจจุบัน
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0]
   );
@@ -34,10 +33,6 @@ export default function AddFoodPage() {
     const data = Object.fromEntries(formData.entries());
     console.log("Form data to be saved:", data);
     alert("Food saved successfully! (Check console for data)");
-    // สามารถ redirect ไปหน้า dashboard หลังบันทึกสำเร็จได้ที่นี่
-    // import { useRouter } from 'next/navigation';
-    // const router = useRouter();
-    // router.push('/dashboard');
   };
 
   return (
@@ -48,7 +43,6 @@ export default function AddFoodPage() {
         </h1>
 
         <form onSubmit={handleSubmit} className="w-full">
-          {/* Food Name Input */}
           <div className="mb-4">
             <label
               className="block text-gray-700 text-sm font-bold mb-2"
@@ -66,7 +60,6 @@ export default function AddFoodPage() {
             />
           </div>
 
-          {/* Meal Type Select */}
           <div className="mb-4">
             <label
               className="block text-gray-700 text-sm font-bold mb-2"
@@ -86,7 +79,6 @@ export default function AddFoodPage() {
             </select>
           </div>
 
-          {/* Date Picker */}
           <div className="mb-4">
             <label
               className="block text-gray-700 text-sm font-bold mb-2"
@@ -105,7 +97,6 @@ export default function AddFoodPage() {
             />
           </div>
 
-          {/* Image Upload & Preview */}
           <div className="mb-6">
             <label className="block text-gray-700 text-sm font-bold mb-2">
               Food Picture
@@ -138,7 +129,6 @@ export default function AddFoodPage() {
             />
           </div>
 
-          {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 mt-8">
             <Link href="/dashboard" passHref className="w-full">
               <button

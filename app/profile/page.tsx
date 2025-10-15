@@ -5,7 +5,6 @@
 import { useState } from "react";
 import Link from "next/link";
 
-// --- Mock Data: ในแอปจริง ข้อมูลนี้จะถูกดึงมาจาก API หลัง login ---
 const currentUser = {
   fullName: "Somsak Jaidee",
   email: "somsak.j@example.com",
@@ -13,7 +12,6 @@ const currentUser = {
   profilePicture: "https://i.pravatar.cc/150?u=somsak",
 };
 
-// --- Type Definition for Clarity ---
 type UserProfile = typeof currentUser;
 
 export default function ProfilePage() {
@@ -42,7 +40,7 @@ export default function ProfilePage() {
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    // เพิ่ม Logic สำหรับส่งข้อมูลที่แก้ไขแล้วไปอัปเดตที่ API
+
     console.log("Profile updated:", { ...formData, newImage: imagePreview });
     alert("Profile saved successfully!");
   };
@@ -55,13 +53,8 @@ export default function ProfilePage() {
         </h1>
 
         <form onSubmit={handleSubmit} className="w-full space-y-4">
-          {/* Image Upload & Preview */}
           <div className="flex flex-col items-center space-y-4">
-            <div className="w-32 h-32 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden ring-4 ring-green-200">
-              {/* {imagePreview && (
-                <Image src={imagePreview} alt="Profile Preview" width={128} height={128} className="object-cover w-full h-full" />
-              )} */}
-            </div>
+            <div className="w-32 h-32 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden ring-4 ring-green-200"></div>
             <label
               htmlFor="profilePicture"
               className="cursor-pointer bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-6 rounded-lg transition-colors"
@@ -77,7 +70,6 @@ export default function ProfilePage() {
             />
           </div>
 
-          {/* Full Name Input */}
           <div>
             <label
               className="block text-gray-700 text-sm font-bold mb-2"
@@ -96,7 +88,6 @@ export default function ProfilePage() {
             />
           </div>
 
-          {/* Email Input */}
           <div>
             <label
               className="block text-gray-700 text-sm font-bold mb-2"
@@ -115,7 +106,6 @@ export default function ProfilePage() {
             />
           </div>
 
-          {/* Gender Select */}
           <div>
             <label
               className="block text-gray-700 text-sm font-bold mb-2"
@@ -136,7 +126,6 @@ export default function ProfilePage() {
             </select>
           </div>
 
-          {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 pt-6">
             <Link href="/dashboard" passHref className="w-full">
               <button

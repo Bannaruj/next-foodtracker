@@ -5,7 +5,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 
-// --- Mock Data ---
 const mockFoodData = [
   {
     id: 1,
@@ -30,7 +29,6 @@ const mockFoodData = [
   },
 ];
 
-// --- Type Definitions ---
 interface FoodItem {
   id: number;
   date: string;
@@ -39,13 +37,11 @@ interface FoodItem {
   imageUrl: string;
 }
 
-// 2. แก้ไข Type ของ Props ให้ params เป็น Promise
 interface PageProps {
   params: Promise<{ id: string }>;
 }
 
 export default function EditFoodPage({ params }: PageProps) {
-  // 3. ใช้ use hook เพื่อดึงค่า id ออกมาจาก Promise
   const { id } = use(params);
   const router = useRouter();
   const [foodItem, setFoodItem] = useState<FoodItem | null>(null);
@@ -63,9 +59,7 @@ export default function EditFoodPage({ params }: PageProps) {
       alert("Food item not found!");
       router.push("/dashboard");
     }
-  }, [id, router]); // 5. แก้ไข dependency array เป็น id
-
-  // ... (ส่วนที่เหลือของโค้ดเหมือนเดิม ไม่ต้องแก้ไข) ...
+  }, [id, router]);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -112,7 +106,6 @@ export default function EditFoodPage({ params }: PageProps) {
         </h1>
 
         <form onSubmit={handleSubmit} className="w-full space-y-4">
-          {/* Image Upload & Preview */}
           <div>
             <label className="block text-gray-700 text-sm font-bold mb-2">
               Food Picture
@@ -145,7 +138,6 @@ export default function EditFoodPage({ params }: PageProps) {
             />
           </div>
 
-          {/* Food Name Input */}
           <div>
             <label
               className="block text-gray-700 text-sm font-bold mb-2"
@@ -164,7 +156,6 @@ export default function EditFoodPage({ params }: PageProps) {
             />
           </div>
 
-          {/* Meal Type Select */}
           <div>
             <label
               className="block text-gray-700 text-sm font-bold mb-2"
@@ -186,7 +177,6 @@ export default function EditFoodPage({ params }: PageProps) {
             </select>
           </div>
 
-          {/* Date Picker */}
           <div>
             <label
               className="block text-gray-700 text-sm font-bold mb-2"
@@ -205,7 +195,6 @@ export default function EditFoodPage({ params }: PageProps) {
             />
           </div>
 
-          {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 pt-6">
             <Link href="/dashboard" passHref className="w-full">
               <button

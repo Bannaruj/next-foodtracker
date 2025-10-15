@@ -3,7 +3,6 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 
-// --- Mock Data ---
 const mockFoodData = [
   {
     id: 1,
@@ -41,7 +40,6 @@ export default function DashBoardPage() {
     );
   }, [searchTerm]);
 
-  // Paginate the filtered data
   const paginatedData = useMemo(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     return filteredData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
@@ -63,7 +61,6 @@ export default function DashBoardPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-200 via-blue-200 to-purple-300 p-4 sm:p-6 lg:p-8">
       <main className="container mx-auto bg-white/70 backdrop-blur-md rounded-2xl shadow-lg p-6">
-        {/* Header: Search and Add Button */}
         <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
           <div className="relative w-full sm:w-auto">
             <input
@@ -107,7 +104,6 @@ export default function DashBoardPage() {
           </Link>
         </div>
 
-        {/* Food Log Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-left table-auto">
             <thead className="bg-gray-100">
@@ -127,13 +123,6 @@ export default function DashBoardPage() {
                     <td className="p-4 text-gray-700">{item.date}</td>
                     <td className="p-4">
                       <div className="flex items-center gap-4">
-                        {/* <Image
-                          src={item.imageUrl}
-                          alt={item.name}
-                          width={50}
-                          height={50}
-                          className="rounded-lg object-cover"
-                        /> */}
                         <span className="font-medium text-gray-800">
                           {item.name}
                         </span>
@@ -146,7 +135,6 @@ export default function DashBoardPage() {
                     </td>
                     <td className="p-4 text-center">
                       <button className="p-2 text-blue-500 hover:text-blue-700 hover:bg-blue-100 rounded-full transition-colors">
-                        {/* Edit Icon */}
                         <svg
                           className="w-5 h-5"
                           fill="none"
@@ -162,7 +150,6 @@ export default function DashBoardPage() {
                         </svg>
                       </button>
                       <button className="p-2 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-full transition-colors ml-2">
-                        {/* Delete Icon */}
                         <svg
                           className="w-5 h-5"
                           fill="none"
@@ -191,7 +178,6 @@ export default function DashBoardPage() {
           </table>
         </div>
 
-        {/* Pagination Controls */}
         {totalPages > 1 && (
           <div className="flex justify-center items-center mt-6 gap-2">
             <button
