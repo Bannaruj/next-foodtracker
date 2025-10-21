@@ -5,10 +5,22 @@ import { supabase } from "@/app/utils/supabaseClient";
 import Link from "next/link";
 import Image from "next/image";
 
+interface FoodRow {
+  id: string;
+  foodname: string | null;
+  meal: string | null;
+  fooddate_at: string | null; // date string
+  food_image_url: string | null;
+}
+
 export default function DashBoardPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [userImage, setUserImage] = useState<string | null>(null);
+  const [foods, setFoods] = useState<FoodRow[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
 
   // Fetch user profile image on mount
   useEffect(() => {
@@ -34,6 +46,97 @@ export default function DashBoardPage() {
     };
     fetchProfile();
   }, []);
+
+  // Fetch foods
+  useEffect(() => {
+    const fetchFoods = async () => {
+      setIsLoading(true);
+      setLoadError(null);
+      try {
+        const { data, error } = await supabase
+          .from("food_tb")
+          .select("id, foodname, meal, fooddate_at, food_image_url")
+          .order("fooddate_at", { ascending: false });
+        if (error) throw error;
+        setFoods((data as FoodRow[]) ?? []);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        setLoadError(msg);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchFoods();
+  }, []);
+
+  // Delete a food row and its image (if any)
+  const handleDelete = async (food: FoodRow) => {
+    if (!food?.id) return;
+    const confirmed = window.confirm("Delete this food item?");
+    if (!confirmed) return;
+
+    setIsDeletingId(food.id);
+    try {
+      // Remove image from storage if available
+      if (food.food_image_url) {
+        try {
+          // Extract path within bucket from the public URL
+          let pathInBucket: string | null = null;
+          try {
+            const url = new URL(food.food_image_url);
+            const idx = url.pathname.indexOf("/Foodtb_bk/");
+            if (idx >= 0) {
+              pathInBucket = decodeURIComponent(
+                url.pathname.substring(idx + "/Foodtb_bk/".length)
+              );
+            }
+          } catch {
+            // Fallback: best-effort split
+            const marker = "/Foodtb_bk/";
+            const idx2 = food.food_image_url.indexOf(marker);
+            if (idx2 >= 0) {
+              pathInBucket = decodeURIComponent(
+                food.food_image_url.substring(idx2 + marker.length)
+              );
+            }
+          }
+
+          if (pathInBucket) {
+            await supabase.storage.from("Foodtb_bk").remove([pathInBucket]);
+          }
+        } catch (imgErr) {
+          // Ignore image deletion failure; continue with row deletion
+          console.warn("Image removal failed:", imgErr);
+        }
+      }
+
+      // Delete the row from table
+      const { error } = await supabase
+        .from("food_tb")
+        .delete()
+        .eq("id", food.id);
+      if (error) throw error;
+
+      // Update local state
+      setFoods((prev) => prev.filter((f) => f.id !== food.id));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      alert(`Failed to delete: ${msg}`);
+    } finally {
+      setIsDeletingId(null);
+    }
+  };
+
+  // Simple client-side search filter
+  const filteredFoods = foods.filter((f) => {
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return true;
+    return (
+      (f.foodname ?? "").toLowerCase().includes(term) ||
+      (f.meal ?? "").toLowerCase().includes(term) ||
+      (f.fooddate_at ?? "").toLowerCase().includes(term)
+    );
+  });
 
   // TODO: Replace with real data fetching and pagination logic
   const totalPages = 1;
@@ -68,6 +171,7 @@ export default function DashBoardPage() {
                   className="w-12 h-12 rounded-full border-2 border-purple-300 shadow-sm hover:scale-105 transition-transform object-cover"
                   onError={() => setUserImage(null)}
                   priority
+                  unoptimized
                 />
               </div>
             </Link>
@@ -128,12 +232,77 @@ export default function DashBoardPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {/* No mock data, show empty state */}
-              <tr>
-                <td colSpan={5} className="text-center p-8 text-gray-500">
-                  No food found.
-                </td>
-              </tr>
+              {isLoading && (
+                <tr>
+                  <td colSpan={5} className="text-center p-8 text-gray-500">
+                    Loading...
+                  </td>
+                </tr>
+              )}
+              {loadError && !isLoading && (
+                <tr>
+                  <td colSpan={5} className="text-center p-8 text-red-500">
+                    {loadError}
+                  </td>
+                </tr>
+              )}
+              {!isLoading && !loadError && filteredFoods.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="text-center p-8 text-gray-500">
+                    No food found.
+                  </td>
+                </tr>
+              )}
+              {!isLoading &&
+                !loadError &&
+                filteredFoods.map((f) => (
+                  <tr key={f.id} className="hover:bg-gray-50">
+                    <td className="p-4 text-gray-600 align-middle">
+                      {f.fooddate_at ?? "-"}
+                    </td>
+                    <td className="p-4 align-middle">
+                      {f.food_image_url ? (
+                        <Image
+                          src={f.food_image_url}
+                          alt={f.foodname ?? "Food"}
+                          width={64}
+                          height={64}
+                          className="w-16 h-16 object-cover rounded-md border"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 bg-gray-200 rounded-md border flex items-center justify-center text-gray-500 text-xs">
+                          No Image
+                        </div>
+                      )}
+                    </td>
+                    <td className="p-4 text-gray-600 align-middle">
+                      {f.foodname ?? "-"}
+                    </td>
+                    <td className="p-4 text-gray-600 align-middle">
+                      {f.meal ?? "-"}
+                    </td>
+                    <td className="p-4 text-gray-600 align-middle text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <Link
+                          href={`/updatefood/${f.id}`}
+                          className="px-3 py-1 text-sm bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                        >
+                          Edit
+                        </Link>
+                        <button
+                          onClick={() => handleDelete(f)}
+                          className="px-3 py-1 text-sm rounded-md text-white bg-red-500 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={isDeletingId === f.id}
+                          title={
+                            isDeletingId === f.id ? "Deleting..." : "Delete"
+                          }
+                        >
+                          {isDeletingId === f.id ? "Deleting..." : "Delete"}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>

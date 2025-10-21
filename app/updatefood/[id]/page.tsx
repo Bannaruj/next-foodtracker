@@ -1,40 +1,17 @@
 "use client";
 
-import { useState, useEffect, use } from "react"; // 1. เพิ่มการ import 'use'
+import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-
-const mockFoodData = [
-  {
-    id: 1,
-    date: "2025-09-03",
-    name: "Spaghetti Carbonara",
-    meal: "Dinner",
-    imageUrl: "https://placehold.co/600x400/5e8a64/ffffff?text=Spaghetti",
-  },
-  {
-    id: 2,
-    date: "2025-09-03",
-    name: "Avocado Toast",
-    meal: "Breakfast",
-    imageUrl: "https://placehold.co/600x400/a3bf8f/ffffff?text=Avocado+Toast",
-  },
-  {
-    id: 3,
-    date: "2025-09-02",
-    name: "Chicken Caesar Salad",
-    meal: "Lunch",
-    imageUrl: "https://placehold.co/600x400/e8d3a6/ffffff?text=Salad",
-  },
-];
+import { supabase } from "@/app/utils/supabaseClient";
 
 interface FoodItem {
-  id: number;
+  id: string;
   date: string;
   name: string;
-  meal: "Breakfast" | "Lunch" | "Dinner" | "Snack" | string;
-  imageUrl: string;
+  meal: string;
+  imageUrl: string | null;
 }
 
 interface PageProps {
@@ -46,19 +23,39 @@ export default function EditFoodPage({ params }: PageProps) {
   const router = useRouter();
   const [foodItem, setFoodItem] = useState<FoodItem | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
 
+  // Load food item by id from Supabase
   useEffect(() => {
-    // 4. ใช้ 'id' ที่ได้จาก use hook
-    const foodId = parseInt(id, 10);
-    const itemToEdit = mockFoodData.find((item) => item.id === foodId);
-
-    if (itemToEdit) {
-      setFoodItem(itemToEdit);
-      setImagePreview(itemToEdit.imageUrl);
-    } else {
-      alert("Food item not found!");
-      router.push("/dashboard");
-    }
+    const load = async () => {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from("food_tb")
+          .select("id, foodname, meal, fooddate_at, food_image_url")
+          .eq("id", id)
+          .single();
+        if (error || !data) {
+          alert("Food item not found!");
+          router.push("/dashboard");
+          return;
+        }
+        const mapped: FoodItem = {
+          id: data.id,
+          date: data.fooddate_at ?? "",
+          name: data.foodname ?? "",
+          meal: data.meal ?? "",
+          imageUrl: data.food_image_url ?? null,
+        };
+        setFoodItem(mapped);
+        setImagePreview(mapped.imageUrl);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    load();
   }, [id, router]);
 
   const handleInputChange = (
@@ -72,25 +69,123 @@ export default function EditFoodPage({ params }: PageProps) {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setSelectedFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
       };
       reader.readAsDataURL(file);
+    } else {
+      setSelectedFile(null);
     }
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log("Saving updated food item:", {
-      ...foodItem,
-      newImage: imagePreview,
-    });
-    alert("Food item updated successfully!");
-    router.push("/dashboard");
+    if (!foodItem) return;
+
+    setIsUpdating(true);
+    try {
+      let newImageUrl = foodItem.imageUrl;
+
+      // อัปโหลดรูปภาพใหม่ถ้ามีการเลือกไฟล์ใหม่
+      if (selectedFile) {
+        // ตรวจสอบขนาดไฟล์ (จำกัดที่ 5MB)
+        if (selectedFile.size > 5 * 1024 * 1024) {
+          throw new Error("File size must be less than 5MB");
+        }
+
+        // ตรวจสอบประเภทไฟล์
+        const allowedTypes = [
+          "image/jpeg",
+          "image/jpg",
+          "image/png",
+          "image/gif",
+          "image/webp",
+        ];
+        if (!allowedTypes.includes(selectedFile.type)) {
+          throw new Error(
+            "Only image files are allowed (JPEG, PNG, GIF, WebP)"
+          );
+        }
+
+        // ลบรูปภาพเก่าถ้ามี
+        if (foodItem.imageUrl) {
+          try {
+            // Extract path within bucket from the public URL
+            let pathInBucket: string | null = null;
+            try {
+              const url = new URL(foodItem.imageUrl);
+              const idx = url.pathname.indexOf("/Foodtb_bk/");
+              if (idx >= 0) {
+                pathInBucket = decodeURIComponent(
+                  url.pathname.substring(idx + "/Foodtb_bk/".length)
+                );
+              }
+            } catch {
+              // Fallback: best-effort split
+              const marker = "/Foodtb_bk/";
+              const idx2 = foodItem.imageUrl.indexOf(marker);
+              if (idx2 >= 0) {
+                pathInBucket = decodeURIComponent(
+                  foodItem.imageUrl.substring(idx2 + marker.length)
+                );
+              }
+            }
+
+            if (pathInBucket) {
+              await supabase.storage.from("Foodtb_bk").remove([pathInBucket]);
+            }
+          } catch (imgErr) {
+            console.warn("Old image removal failed:", imgErr);
+          }
+        }
+
+        // อัปโหลดรูปภาพใหม่
+        const fileExt = selectedFile.name.split(".").pop();
+        const fileName = `${Date.now()}.${fileExt}`;
+        const filePath = `food-images/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("Foodtb_bk")
+          .upload(filePath, selectedFile);
+
+        if (uploadError) {
+          throw new Error(`Failed to upload image: ${uploadError.message}`);
+        }
+
+        // ดึง URL ของรูปภาพใหม่
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from("Foodtb_bk").getPublicUrl(filePath);
+
+        newImageUrl = publicUrl;
+      }
+
+      // อัปเดตข้อมูลในฐานข้อมูล
+      const { error } = await supabase
+        .from("food_tb")
+        .update({
+          foodname: foodItem.name,
+          meal: foodItem.meal,
+          fooddate_at: foodItem.date,
+          food_image_url: newImageUrl,
+        })
+        .eq("id", foodItem.id);
+
+      if (error) throw error;
+
+      alert("Food item updated successfully!");
+      router.push("/dashboard");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      alert(`Update failed: ${msg}`);
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
-  if (!foodItem) {
+  if (isLoading || !foodItem) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <p className="text-xl text-gray-600">Loading food data...</p>
@@ -115,8 +210,8 @@ export default function EditFoodPage({ params }: PageProps) {
                 <Image
                   src={imagePreview}
                   alt="Food Preview"
-                  layout="fill"
-                  objectFit="cover"
+                  fill
+                  className="object-cover"
                 />
               ) : (
                 <span className="text-gray-500">No Image Preview</span>
@@ -206,9 +301,10 @@ export default function EditFoodPage({ params }: PageProps) {
             </Link>
             <button
               type="submit"
-              className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-full transition-transform transform hover:scale-105"
+              disabled={isUpdating}
+              className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-full transition-transform transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Update Meal
+              {isUpdating ? "Updating..." : "Update Meal"}
             </button>
           </div>
         </form>

@@ -4,10 +4,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { supabase } from "../utils/supabaseClient";
 
 export default function AddFoodPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0]
@@ -16,23 +18,137 @@ export default function AddFoodPage() {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setSelectedFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
       };
       reader.readAsDataURL(file);
     } else {
+      setSelectedFile(null);
       setImagePreview(null);
     }
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    // เพิ่ม Logic สำหรับการบันทึกข้อมูลอาหารไปยัง API ของคุณที่นี่
-    const formData = new FormData(e.currentTarget);
-    const data = Object.fromEntries(formData.entries());
-    console.log("Form data to be saved:", data);
-    alert("Food saved successfully! (Check console for data)");
+    setIsLoading(true);
+
+    try {
+      // เก็บ reference ของ form ไว้ตั้งแต่ต้น เพื่อใช้หลัง await ได้อย่างปลอดภัย
+      const formEl = e.currentTarget;
+
+      // ตรวจสอบการเชื่อมต่อ Supabase
+      console.log("Supabase client:", supabase);
+
+      // ตรวจสอบว่ามีไฟล์ที่เลือกหรือไม่
+      if (!selectedFile) {
+        console.log("No file selected, proceeding without image");
+      }
+      const formData = new FormData(formEl);
+      const data = Object.fromEntries(formData.entries());
+      console.log("Form data:", data);
+
+      let imageUrl = null;
+
+      // อัปโหลดรูปภาพไปยัง Supabase Storage
+      if (selectedFile) {
+        console.log("Selected file:", selectedFile);
+
+        // ตรวจสอบขนาดไฟล์ (จำกัดที่ 5MB)
+        if (selectedFile.size > 5 * 1024 * 1024) {
+          throw new Error("File size must be less than 5MB");
+        }
+
+        // ตรวจสอบประเภทไฟล์
+        const allowedTypes = [
+          "image/jpeg",
+          "image/jpg",
+          "image/png",
+          "image/gif",
+          "image/webp",
+        ];
+        if (!allowedTypes.includes(selectedFile.type)) {
+          throw new Error(
+            "Only image files are allowed (JPEG, PNG, GIF, WebP)"
+          );
+        }
+
+        const fileExt = selectedFile.name.split(".").pop();
+        const fileName = `${Date.now()}.${fileExt}`;
+        const filePath = `food-images/${fileName}`;
+
+        console.log("Uploading to path:", filePath);
+
+        // อัปโหลดไปยัง bucket Foodtb_bk
+        const { error: uploadError } = await supabase.storage
+          .from("Foodtb_bk")
+          .upload(filePath, selectedFile);
+
+        if (uploadError) {
+          console.error("Upload error:", uploadError);
+          // ถ้าอัปโหลดรูปภาพไม่สำเร็จ ให้ดำเนินการต่อโดยไม่มีรูปภาพ
+          console.log("Continuing without image upload...");
+          alert(
+            "Warning: Could not upload image. Food will be saved without image."
+          );
+          imageUrl = null;
+        } else {
+          // ดึง URL ของรูปภาพ
+          const {
+            data: { publicUrl },
+          } = supabase.storage.from("Foodtb_bk").getPublicUrl(filePath);
+
+          imageUrl = publicUrl;
+          console.log("Image uploaded successfully:", imageUrl);
+        }
+      }
+
+      // บันทึกข้อมูลอาหารลงในตาราง food_tb
+      console.log("Inserting food data:", {
+        foodname: data.foodName,
+        meal: data.mealType,
+        fooddate_at: data.date,
+        food_image_url: imageUrl,
+        created_at: new Date().toISOString(),
+      });
+
+      const { data: foodData, error: foodError } = await supabase
+        .from("food_tb")
+        .insert([
+          {
+            foodname: data.foodName,
+            meal: data.mealType,
+            fooddate_at: data.date,
+            food_image_url: imageUrl,
+            created_at: new Date().toISOString(),
+          },
+        ])
+        .select()
+        .single();
+
+      if (foodError) {
+        console.error("Food insert error:", foodError);
+        throw new Error(`Failed to save food data: ${foodError.message}`);
+      }
+
+      console.log("Food data saved successfully:", foodData);
+
+      alert("Food saved successfully!");
+
+      // รีเซ็ตฟอร์มโดยใช้ formEl แทน e.currentTarget ที่อาจเป็น null
+      formEl.reset();
+      setImagePreview(null);
+      setSelectedFile(null);
+      setSelectedDate(new Date().toISOString().split("T")[0]);
+    } catch (error) {
+      console.error("Error saving food:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "An unknown error occurred";
+      alert(`Error saving food: ${errorMessage}`);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -101,13 +217,13 @@ export default function AddFoodPage() {
             <label className="block text-gray-700 text-sm font-bold mb-2">
               Food Picture
             </label>
-            <div className="w-full h-48 bg-gray-200 rounded-lg flex items-center justify-center mb-4 border-2 border-dashed border-gray-400 overflow-hidden">
+            <div className="w-full h-48 bg-gray-200 rounded-lg flex items-center justify-center mb-4 border-2 border-dashed border-gray-400 overflow-hidden relative">
               {imagePreview ? (
-                <Image
+                // Using regular img tag for better control over image preview display
+                <img
                   src={imagePreview}
                   alt="Food Preview"
-                  layout="fill"
-                  objectFit="cover"
+                  className="w-full h-full object-cover rounded-lg"
                 />
               ) : (
                 <span className="text-gray-500">Image Preview</span>
@@ -139,10 +255,11 @@ export default function AddFoodPage() {
               </button>
             </Link>
             <button
-              className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-full focus:outline-none focus:shadow-outline transform transition-transform hover:scale-105"
+              className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-full focus:outline-none focus:shadow-outline transform transition-transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
               type="submit"
+              disabled={isLoading}
             >
-              Save
+              {isLoading ? "Saving..." : "Save"}
             </button>
           </div>
         </form>
