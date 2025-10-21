@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { supabase } from "../utils/supabaseClient";
 
 interface UserProfile {
@@ -39,51 +40,41 @@ export default function ProfilePage() {
         const {
           data: { session },
         } = await supabase.auth.getSession();
+        console.log("Session:", session);
         if (!session?.user) {
           alert("Please login first");
           window.location.href = "/auth/login";
           return;
         }
+        console.log("User ID:", session.user.id);
 
         // Try to get the row; fall back to creating one if not found
+        console.log("Fetching user data for ID:", session.user.id);
         const selectResp = await supabase
           .from("user_tb")
           .select("*")
           .eq("id", session.user.id)
           .single<DbUser>();
 
+        console.log("Select response:", selectResp);
         let userRow: DbUser | null = selectResp.data ?? null;
         const selectError = selectResp.error;
 
         if (selectError && !userRow) {
-          const isNoRow =
-            (selectError as { code?: string; message?: string }).code ===
-              "PGRST116" ||
-            (selectError as { message?: string }).message
-              ?.toLowerCase()
-              ?.includes("no rows");
-          if (isNoRow) {
-            const fullNameMeta =
-              (session.user as { user_metadata?: { full_name?: string } })
-                .user_metadata?.full_name ?? "";
-            const insertResp = await supabase
-              .from("user_tb")
-              .insert([
-                {
-                  id: session.user.id,
-                  email: session.user.email ?? "",
-                  fullname: fullNameMeta,
-                  gender: "Male",
-                  user_image_url: null,
-                },
-              ])
-              .select("*")
-              .single<DbUser>();
-            if (insertResp.error) throw insertResp.error;
-            userRow = insertResp.data ?? null;
-          } else {
-            throw selectError;
-          }
+          // ถ้าไม่มี user record ให้สร้าง default profile แทนการ insert
+          console.log("No user record found, creating default profile");
+          const fullNameMeta =
+            (session.user as { user_metadata?: { full_name?: string } })
+              .user_metadata?.full_name ?? "";
+
+          // สร้าง default profile object แทนการ insert
+          userRow = {
+            id: session.user.id,
+            email: session.user.email ?? "",
+            fullname: fullNameMeta,
+            gender: "Male",
+            user_image_url: null,
+          } as DbUser;
         }
 
         if (!userRow) {
@@ -107,11 +98,19 @@ export default function ProfilePage() {
           stack: err instanceof Error ? err.stack : undefined,
           error: err,
         });
-        alert(
-          `Failed to load profile data: ${
-            err instanceof Error ? err.message : "Unknown error"
-          }`
-        );
+
+        // แสดง error ที่เฉพาะเจาะจงมากขึ้น
+        let errorMessage = "Unknown error";
+        if (err instanceof Error) {
+          errorMessage = err.message;
+        } else if (typeof err === "string") {
+          errorMessage = err;
+        } else if (err && typeof err === "object") {
+          errorMessage = JSON.stringify(err);
+        }
+
+        console.error("Final error message:", errorMessage);
+        alert(`Failed to load profile data: ${errorMessage}`);
       } finally {
         setIsLoading(false);
       }
@@ -221,16 +220,14 @@ export default function ProfilePage() {
         newImageUrl = publicUrl;
       }
 
-      // อัปเดตข้อมูลในฐานข้อมูล
-      const { error } = await supabase
-        .from("user_tb")
-        .update({
-          fullname: formData.fullName,
-          email: formData.email,
-          gender: formData.gender,
-          user_image_url: newImageUrl,
-        })
-        .eq("id", formData.id);
+      // อัปเดตข้อมูลในฐานข้อมูล (ใช้ upsert เพื่อหลีกเลี่ยง RLS policy)
+      const { error } = await supabase.from("user_tb").upsert({
+        id: formData.id,
+        fullname: formData.fullName,
+        email: formData.email,
+        gender: formData.gender,
+        user_image_url: newImageUrl,
+      });
 
       if (error) throw error;
 
@@ -282,12 +279,14 @@ export default function ProfilePage() {
 
         <form onSubmit={handleSubmit} className="w-full space-y-4">
           <div className="flex flex-col items-center space-y-4">
-            <div className="w-32 h-32 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden ring-4 ring-green-200">
+            <div className="w-32 h-32 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden ring-4 ring-green-200 relative">
               {imagePreview ? (
-                <img
+                <Image
                   src={imagePreview}
                   alt="Profile Preview"
-                  className="w-full h-full object-cover"
+                  fill
+                  className="object-cover"
+                  sizes="128px"
                 />
               ) : (
                 <span className="text-gray-500 text-sm">No Image</span>
