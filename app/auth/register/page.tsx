@@ -5,7 +5,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { supabase } from "@/app/utils/supabaseClient";
 
-// Define form state type
 interface FormData {
   fullName: string;
   email: string;
@@ -13,7 +12,6 @@ interface FormData {
   gender: string;
 }
 
-// Interface สำหรับ Supabase Error (ใช้ในการจัดการ Type Safety)
 interface SupabaseError {
   message: string;
   details?: string;
@@ -22,7 +20,7 @@ interface SupabaseError {
 
 export default function RegisterPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [imageFile, setImageFile] = useState<File | null>(null); // State ใหม่สำหรับเก็บ File Object
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [formData, setFormData] = useState<FormData>({
     fullName: "",
     email: "",
@@ -36,7 +34,7 @@ export default function RegisterPage() {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setImageFile(file); // 💾 เก็บ File Object
+      setImageFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
@@ -64,59 +62,98 @@ export default function RegisterPage() {
     setMessage(null);
 
     const { fullName, email, password, gender } = formData;
-    let user_image_url: string | null = null; // เปลี่ยนให้เป็น let และกำหนด Type ให้ถูกต้อง
+    let user_image_url: string | null = null;
 
     try {
-      // 1. Sign up user (Auth)
+      // 1) Sign up user
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
       });
 
-      if (authError) throw authError;
+      if (authError) {
+        const errObj = authError as unknown;
+        const code = (errObj as { code?: string | number })?.code;
+        const msg = (errObj as { message?: string })?.message ?? "";
+        if (
+          code === "email_provider_disabled" ||
+          msg.includes("email provider disabled")
+        ) {
+          setError(
+            "Registration is disabled: email signups are not enabled in your Supabase project. Enable the Email provider in Supabase Auth settings or use a different auth method."
+          );
+          return;
+        }
+        throw authError;
+      }
 
       const userId = authData.user?.id;
 
+      // 2) Try to obtain a session (some setups don't return a session immediately)
+      let session: unknown =
+        (authData as unknown as { session?: unknown })?.session ?? null;
+      if (!session) {
+        try {
+          const { data: signInData, error: signInError } =
+            await supabase.auth.signInWithPassword({
+              email,
+              password,
+            });
+          if (!signInError) {
+            session =
+              (signInData as unknown as { session?: unknown })?.session ?? null;
+          }
+        } catch (e) {
+          console.warn("Auto sign-in attempt threw:", e);
+        }
+      }
+
+      // 3) If we have a userId, optionally upload image and insert profile
       if (userId) {
-        // 2. Upload Profile Image (Storage) - ถ้ามีรูปภาพ
-        if (imageFile) {
+        if (imageFile && session) {
           const fileExtension = imageFile.name.split(".").pop();
           const filePath = `${userId}/${Date.now()}.${fileExtension}`;
 
-          const { error: uploadError } = await supabase.storage
-            .from("image_bk")
-            .upload(filePath, imageFile, {
-              cacheControl: "3600",
-              upsert: true,
-            });
+          const { data: uploadData, error: uploadError } =
+            await supabase.storage
+              .from("usertb_bk")
+              .upload(filePath, imageFile, {
+                cacheControl: "3600",
+                upsert: true,
+              });
 
           if (uploadError) throw uploadError;
+          if (!uploadData)
+            throw new Error("Failed to upload image to storage.");
 
-          // รับ URL สาธารณะของรูปภาพ
           const { data: publicUrlData } = supabase.storage
-            .from("image_bk")
+            .from("usertb_bk")
             .getPublicUrl(filePath);
-
-          user_image_url = publicUrlData.publicUrl;
+          user_image_url =
+            (publicUrlData as { publicUrl?: string })?.publicUrl ?? null;
+        } else if (imageFile && !session) {
+          // If no session, skip upload and inform user to upload later after confirming
+          setMessage(
+            "Registration successful! Please check your email to confirm your account. You can upload a profile picture after you sign in."
+          );
         }
 
-        // 3. Insert user profile data (Database)
         const { error: dbError } = await supabase.from("user_tb").insert({
-          // แก้ชื่อตารางเป็น user_tb
           id: userId,
           fullname: fullName,
+          password: password,
           email: email,
           gender: gender,
-          user_image_url: user_image_url, // บันทึก URL ที่ได้จากการอัปโหลด
+          user_image_url: user_image_url,
         });
 
         if (dbError) throw dbError;
 
         setMessage(
-          "Registration successful! Please check your email for confirmation."
+          "Registration successful! Please check your email for confirmation. (Note: your password is stored securely by Supabase Auth and not saved as plaintext in the user_tb table.)"
         );
 
-        // เคลียร์ฟอร์ม
+        // clear form
         setFormData({ fullName: "", email: "", password: "", gender: "Male" });
         setImagePreview(null);
         setImageFile(null);
@@ -126,16 +163,10 @@ export default function RegisterPage() {
         );
       }
     } catch (err: unknown) {
-      console.error(
-        "Registration Error (Full Object):",
-        JSON.stringify(err, null, 2)
-      );
-
-      // จัดการ Error โดยใช้ Interface ที่กำหนดไว้
+      console.warn("Registration Error:", err);
       if (err instanceof Error) {
         setError(err.message);
       } else if (typeof err === "object" && err !== null && "message" in err) {
-        // สำหรับ Supabase Error ที่มีโครงสร้างเป็น Object
         setError((err as SupabaseError).message);
       } else {
         setError(
@@ -238,7 +269,6 @@ export default function RegisterPage() {
             </select>
           </div>
 
-          {/* Image Upload & Preview */}
           <div className="mb-6">
             <label className="block text-gray-700 text-sm font-bold mb-2">
               Profile Picture
@@ -273,7 +303,6 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          {/* Submit Button */}
           <div className="flex items-center justify-between">
             <button
               className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-full focus:outline-none focus:shadow-outline transform transition-transform hover:scale-105 disabled:bg-gray-400"
@@ -285,7 +314,6 @@ export default function RegisterPage() {
           </div>
         </form>
 
-        {/* Login Link */}
         <p className="text-center text-gray-600 text-sm mt-6">
           Already have an account?{" "}
           <Link

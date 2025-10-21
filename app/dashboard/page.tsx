@@ -62,27 +62,38 @@ export default function DashBoardPage() {
     <div className="min-h-screen bg-gradient-to-br from-green-200 via-blue-200 to-purple-300 p-4 sm:p-6 lg:p-8">
       <main className="container mx-auto bg-white/70 backdrop-blur-md rounded-2xl shadow-lg p-6">
         <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
-          <div className="relative w-full sm:w-auto">
-            <input
-              type="text"
-              placeholder="Search food..."
-              value={searchTerm}
-              onChange={handleSearchChange}
-              className="pl-10 pr-4 py-2 border rounded-full w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-green-400"
-            />
-            <svg
-              className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M21 21l-4.35-4.35M16.65 10.35a6.3 6.3 0 11-12.6 0 6.3 6.3 0 0112.6 0z"
-              ></path>
-            </svg>
+          <div className="flex items-center gap-4 w-full sm:w-auto">
+            <Link href="/profile" passHref>
+              <div className="cursor-pointer">
+                <img
+                  src="https://ui-avatars.com/api/?name=User&background=8b5cf6&color=fff&rounded=true&size=48"
+                  alt="Profile Avatar"
+                  className="w-12 h-12 rounded-full border-2 border-purple-300 shadow-sm hover:scale-105 transition-transform"
+                />
+              </div>
+            </Link>
+            <div className="relative w-full sm:w-auto">
+              <input
+                type="text"
+                placeholder="Search food..."
+                value={searchTerm}
+                onChange={handleSearchChange}
+                className="pl-10 pr-4 py-2 border rounded-full w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-green-400"
+              />
+              <svg
+                className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M21 21l-4.35-4.35M16.65 10.35a6.3 6.3 0 11-12.6 0 6.3 6.3 0 0112.6 0z"
+                ></path>
+              </svg>
+            </div>
           </div>
           <Link href="/addfood" passHref>
             <button className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2 bg-green-500 text-white font-bold rounded-full hover:bg-green-600 transition-transform transform hover:scale-105">
@@ -109,6 +120,7 @@ export default function DashBoardPage() {
             <thead className="bg-gray-100">
               <tr>
                 <th className="p-4 font-semibold text-gray-600">Date</th>
+                <th className="p-4 font-semibold text-gray-600">Picture</th>
                 <th className="p-4 font-semibold text-gray-600">Food</th>
                 <th className="p-4 font-semibold text-gray-600">Meal</th>
                 <th className="p-4 font-semibold text-gray-600 text-center">
@@ -121,6 +133,13 @@ export default function DashBoardPage() {
                 paginatedData.map((item) => (
                   <tr key={item.id} className="hover:bg-gray-50">
                     <td className="p-4 text-gray-700">{item.date}</td>
+                    <td className="p-4">
+                      <img
+                        src={item.imageUrl}
+                        alt={item.name}
+                        className="w-12 h-12 object-cover rounded-lg border"
+                      />
+                    </td>
                     <td className="p-4">
                       <div className="flex items-center gap-4">
                         <span className="font-medium text-gray-800">
@@ -169,7 +188,7 @@ export default function DashBoardPage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={4} className="text-center p-8 text-gray-500">
+                  <td colSpan={5} className="text-center p-8 text-gray-500">
                     No food found.
                   </td>
                 </tr>
