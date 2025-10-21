@@ -65,7 +65,6 @@ export default function RegisterPage() {
     let user_image_url: string | null = null;
 
     try {
-      // 1) Sign up user
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -89,28 +88,24 @@ export default function RegisterPage() {
 
       const userId = authData.user?.id;
 
-      // 2) Try to obtain a session (some setups don't return a session immediately)
-      let session: unknown =
-        (authData as unknown as { session?: unknown })?.session ?? null;
-      if (!session) {
-        try {
-          const { data: signInData, error: signInError } =
-            await supabase.auth.signInWithPassword({
-              email,
-              password,
-            });
-          if (!signInError) {
-            session =
-              (signInData as unknown as { session?: unknown })?.session ?? null;
-          }
-        } catch (e) {
-          console.warn("Auto sign-in attempt threw:", e);
-        }
+      let session = null;
+      try {
+        const { data: signInData, error: signInError } =
+          await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+        if (signInError) throw signInError;
+        session =
+          (signInData as unknown as { session?: unknown })?.session ?? null;
+      } catch (e) {
+        // If sign in fails, skip image upload
+        console.warn("Sign in after register failed:", e);
       }
 
-      // 3) If we have a userId, optionally upload image and insert profile
       if (userId) {
         if (imageFile && session) {
+          console.log("Session for upload:", session);
           const fileExtension = imageFile.name.split(".").pop();
           const filePath = `${userId}/${Date.now()}.${fileExtension}`;
 
@@ -122,9 +117,19 @@ export default function RegisterPage() {
                 upsert: true,
               });
 
-          if (uploadError) throw uploadError;
-          if (!uploadData)
-            throw new Error("Failed to upload image to storage.");
+          if (uploadError) {
+            console.error("Upload error:", uploadError);
+            setError(
+              `Image upload error: ${uploadError.message || uploadError}`
+            );
+            setLoading(false);
+            return;
+          }
+          if (!uploadData) {
+            setError("Failed to upload image to storage.");
+            setLoading(false);
+            return;
+          }
 
           const { data: publicUrlData } = supabase.storage
             .from("usertb_bk")
@@ -132,7 +137,6 @@ export default function RegisterPage() {
           user_image_url =
             (publicUrlData as { publicUrl?: string })?.publicUrl ?? null;
         } else if (imageFile && !session) {
-          // If no session, skip upload and inform user to upload later after confirming
           setMessage(
             "Registration successful! Please check your email to confirm your account. You can upload a profile picture after you sign in."
           );
@@ -153,14 +157,11 @@ export default function RegisterPage() {
           "Registration successful! Please check your email for confirmation. (Note: your password is stored securely by Supabase Auth and not saved as plaintext in the user_tb table.)"
         );
 
-        // clear form
         setFormData({ fullName: "", email: "", password: "", gender: "Male" });
         setImagePreview(null);
         setImageFile(null);
       } else {
-        setMessage(
-          "Registration successful! Please check your email to confirm your account."
-        );
+        setMessage("การลงทะเบียนเสร็จสมบูรณ์");
       }
     } catch (err: unknown) {
       console.warn("Registration Error:", err);
@@ -169,9 +170,7 @@ export default function RegisterPage() {
       } else if (typeof err === "object" && err !== null && "message" in err) {
         setError((err as SupabaseError).message);
       } else {
-        setError(
-          "An unexpected error occurred during registration. (Check console)"
-        );
+        setError("เกิดข้อผิดพลาด");
       }
     } finally {
       setLoading(false);

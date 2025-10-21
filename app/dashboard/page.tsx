@@ -1,51 +1,42 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/app/utils/supabaseClient";
 import Link from "next/link";
-
-const mockFoodData = [
-  {
-    id: 1,
-    date: "2025-09-03",
-    name: "Spaghetti Carbonara",
-    meal: "Dinner",
-    imageUrl: "https://picsum.photos/id/10/200/200",
-  },
-  {
-    id: 2,
-    date: "2025-09-03",
-    name: "Avocado Toast",
-    meal: "Breakfast",
-    imageUrl: "https://picsum.photos/id/20/200/200",
-  },
-  {
-    id: 3,
-    date: "2025-09-02",
-    name: "Chicken Caesar Salad",
-    meal: "Lunch",
-    imageUrl: "https://picsum.photos/id/30/200/200",
-  },
-];
-
-const ITEMS_PER_PAGE = 5;
+import Image from "next/image";
 
 export default function DashBoardPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [userImage, setUserImage] = useState<string | null>(null);
 
-  // Filter data based on search term
-  const filteredData = useMemo(() => {
-    return mockFoodData.filter((item) =>
-      item.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [searchTerm]);
+  // Fetch user profile image on mount
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user;
+      if (user && user.id) {
+        const { data, error } = await supabase
+          .from("user_tb")
+          .select("user_image_url")
+          .eq("id", user.id)
+          .single();
+        if (!error && data?.user_image_url) {
+          setUserImage(data.user_image_url);
+        } else {
+          setUserImage(null);
+        }
+      } else {
+        setUserImage(null);
+      }
+    };
+    fetchProfile();
+  }, []);
 
-  const paginatedData = useMemo(() => {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [filteredData, currentPage]);
-
-  const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
+  // TODO: Replace with real data fetching and pagination logic
+  const totalPages = 1;
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
@@ -65,10 +56,18 @@ export default function DashBoardPage() {
           <div className="flex items-center gap-4 w-full sm:w-auto">
             <Link href="/profile" passHref>
               <div className="cursor-pointer">
-                <img
-                  src="https://ui-avatars.com/api/?name=User&background=8b5cf6&color=fff&rounded=true&size=48"
+                <Image
+                  src={
+                    userImage && userImage.startsWith("http")
+                      ? userImage
+                      : "https://ui-avatars.com/api/?name=User&background=8b5cf6&color=fff&rounded=true&size=48"
+                  }
                   alt="Profile Avatar"
-                  className="w-12 h-12 rounded-full border-2 border-purple-300 shadow-sm hover:scale-105 transition-transform"
+                  width={48}
+                  height={48}
+                  className="w-12 h-12 rounded-full border-2 border-purple-300 shadow-sm hover:scale-105 transition-transform object-cover"
+                  onError={() => setUserImage(null)}
+                  priority
                 />
               </div>
             </Link>
@@ -129,70 +128,12 @@ export default function DashBoardPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {paginatedData.length > 0 ? (
-                paginatedData.map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50">
-                    <td className="p-4 text-gray-700">{item.date}</td>
-                    <td className="p-4">
-                      <img
-                        src={item.imageUrl}
-                        alt={item.name}
-                        className="w-12 h-12 object-cover rounded-lg border"
-                      />
-                    </td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-4">
-                        <span className="font-medium text-gray-800">
-                          {item.name}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <span className="px-3 py-1 text-sm rounded-full bg-blue-100 text-blue-800">
-                        {item.meal}
-                      </span>
-                    </td>
-                    <td className="p-4 text-center">
-                      <button className="p-2 text-blue-500 hover:text-blue-700 hover:bg-blue-100 rounded-full transition-colors">
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="2"
-                            d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z"
-                          ></path>
-                        </svg>
-                      </button>
-                      <button className="p-2 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-full transition-colors ml-2">
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="2"
-                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                          ></path>
-                        </svg>
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={5} className="text-center p-8 text-gray-500">
-                    No food found.
-                  </td>
-                </tr>
-              )}
+              {/* No mock data, show empty state */}
+              <tr>
+                <td colSpan={5} className="text-center p-8 text-gray-500">
+                  No food found.
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>
