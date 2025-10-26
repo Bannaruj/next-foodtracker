@@ -1,10 +1,9 @@
-// app/addfood/page.tsx
-
 "use client";
 
 import { useState } from "react";
 import Link from "next/link";
 import { supabase } from "../utils/supabaseClient";
+import Image from "next/image";
 
 export default function AddFoodPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -35,13 +34,8 @@ export default function AddFoodPage() {
     setIsLoading(true);
 
     try {
-      // เก็บ reference ของ form ไว้ตั้งแต่ต้น เพื่อใช้หลัง await ได้อย่างปลอดภัย
       const formEl = e.currentTarget;
-
-      // ตรวจสอบการเชื่อมต่อ Supabase
       console.log("Supabase client:", supabase);
-
-      // ตรวจสอบว่ามีไฟล์ที่เลือกหรือไม่
       if (!selectedFile) {
         console.log("No file selected, proceeding without image");
       }
@@ -51,16 +45,13 @@ export default function AddFoodPage() {
 
       let imageUrl = null;
 
-      // อัปโหลดรูปภาพไปยัง Supabase Storage
       if (selectedFile) {
         console.log("Selected file:", selectedFile);
 
-        // ตรวจสอบขนาดไฟล์ (จำกัดที่ 5MB)
         if (selectedFile.size > 5 * 1024 * 1024) {
           throw new Error("File size must be less than 5MB");
         }
 
-        // ตรวจสอบประเภทไฟล์
         const allowedTypes = [
           "image/jpeg",
           "image/jpg",
@@ -80,21 +71,19 @@ export default function AddFoodPage() {
 
         console.log("Uploading to path:", filePath);
 
-        // อัปโหลดไปยัง bucket Foodtb_bk
         const { error: uploadError } = await supabase.storage
           .from("Foodtb_bk")
           .upload(filePath, selectedFile);
 
         if (uploadError) {
           console.error("Upload error:", uploadError);
-          // ถ้าอัปโหลดรูปภาพไม่สำเร็จ ให้ดำเนินการต่อโดยไม่มีรูปภาพ
+
           console.log("Continuing without image upload...");
           alert(
             "Warning: Could not upload image. Food will be saved without image."
           );
           imageUrl = null;
         } else {
-          // ดึง URL ของรูปภาพ
           const {
             data: { publicUrl },
           } = supabase.storage.from("Foodtb_bk").getPublicUrl(filePath);
@@ -104,7 +93,6 @@ export default function AddFoodPage() {
         }
       }
 
-      // บันทึกข้อมูลอาหารลงในตาราง food_tb
       console.log("Inserting food data:", {
         foodname: data.foodName,
         meal: data.mealType,
@@ -136,7 +124,6 @@ export default function AddFoodPage() {
 
       alert("Food saved successfully!");
 
-      // รีเซ็ตฟอร์มโดยใช้ formEl แทน e.currentTarget ที่อาจเป็น null
       formEl.reset();
       setImagePreview(null);
       setSelectedFile(null);
@@ -219,8 +206,7 @@ export default function AddFoodPage() {
             </label>
             <div className="w-full h-48 bg-gray-200 rounded-lg flex items-center justify-center mb-4 border-2 border-dashed border-gray-400 overflow-hidden relative">
               {imagePreview ? (
-                // Using regular img tag for better control over image preview display
-                <img
+                <Image
                   src={imagePreview}
                   alt="Food Preview"
                   className="w-full h-full object-cover rounded-lg"

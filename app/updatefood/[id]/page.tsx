@@ -27,7 +27,6 @@ export default function EditFoodPage({ params }: PageProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // Load food item by id from Supabase
   useEffect(() => {
     const load = async () => {
       setIsLoading(true);
@@ -88,9 +87,7 @@ export default function EditFoodPage({ params }: PageProps) {
     try {
       let newImageUrl = foodItem.imageUrl;
 
-      // อัปโหลดรูปภาพใหม่ถ้ามีการเลือกไฟล์ใหม่
       if (selectedFile) {
-        // ตรวจสอบขนาดไฟล์ (จำกัดที่ 5MB)
         if (selectedFile.size > 5 * 1024 * 1024) {
           throw new Error("File size must be less than 5MB");
         }
@@ -109,10 +106,8 @@ export default function EditFoodPage({ params }: PageProps) {
           );
         }
 
-        // ลบรูปภาพเก่าถ้ามี
         if (foodItem.imageUrl) {
           try {
-            // Extract path within bucket from the public URL
             let pathInBucket: string | null = null;
             try {
               const url = new URL(foodItem.imageUrl);
@@ -123,7 +118,6 @@ export default function EditFoodPage({ params }: PageProps) {
                 );
               }
             } catch {
-              // Fallback: best-effort split
               const marker = "/Foodtb_bk/";
               const idx2 = foodItem.imageUrl.indexOf(marker);
               if (idx2 >= 0) {
@@ -141,7 +135,6 @@ export default function EditFoodPage({ params }: PageProps) {
           }
         }
 
-        // อัปโหลดรูปภาพใหม่
         const fileExt = selectedFile.name.split(".").pop();
         const fileName = `${Date.now()}.${fileExt}`;
         const filePath = `food-images/${fileName}`;
@@ -154,7 +147,6 @@ export default function EditFoodPage({ params }: PageProps) {
           throw new Error(`Failed to upload image: ${uploadError.message}`);
         }
 
-        // ดึง URL ของรูปภาพใหม่
         const {
           data: { publicUrl },
         } = supabase.storage.from("Foodtb_bk").getPublicUrl(filePath);
@@ -162,7 +154,6 @@ export default function EditFoodPage({ params }: PageProps) {
         newImageUrl = publicUrl;
       }
 
-      // อัปเดตข้อมูลในฐานข้อมูล
       const { error } = await supabase
         .from("food_tb")
         .update({

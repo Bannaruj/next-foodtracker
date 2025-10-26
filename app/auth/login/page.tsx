@@ -39,7 +39,6 @@ export default function LoginPage() {
 
       const userId = authData.user?.id;
 
-      // Optionally fetch profile from `user_tb` to ensure user exists there
       if (userId) {
         const { data: profileData, error: profileError } = await supabase
           .from("user_tb")
@@ -49,10 +48,8 @@ export default function LoginPage() {
           .single();
 
         if (profileError) {
-          // Not fatal for login; warn and continue
           console.warn("Failed to fetch profile after login:", profileError);
         } else {
-          // you can store profileData in a client store or context here if needed
           console.log("Logged in user profile:", profileData);
         }
       }
@@ -61,7 +58,6 @@ export default function LoginPage() {
     } catch (err: unknown) {
       console.error("Login Error:", err);
 
-      // จัดการ Error
       if (err instanceof Error) {
         setError(err.message);
       } else if (typeof err === "object" && err !== null && "message" in err) {
@@ -84,7 +80,6 @@ export default function LoginPage() {
           <p className="text-gray-600 mb-8">Login to continue tracking.</p>
 
           <form onSubmit={handleSubmit} className="w-full">
-            {/* แสดง Error Message */}
             {error && (
               <p className="text-red-500 mb-4 font-semibold p-2 bg-red-100 rounded-lg">
                 {error}

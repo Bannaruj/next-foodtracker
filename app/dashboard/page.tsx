@@ -9,7 +9,7 @@ interface FoodRow {
   id: string;
   foodname: string | null;
   meal: string | null;
-  fooddate_at: string | null; // date string
+  fooddate_at: string | null;
   food_image_url: string | null;
 }
 
@@ -22,7 +22,6 @@ export default function DashBoardPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
 
-  // Fetch user profile image on mount
   useEffect(() => {
     const fetchProfile = async () => {
       const {
@@ -47,7 +46,6 @@ export default function DashBoardPage() {
     fetchProfile();
   }, []);
 
-  // Fetch foods
   useEffect(() => {
     const fetchFoods = async () => {
       setIsLoading(true);
@@ -69,7 +67,6 @@ export default function DashBoardPage() {
     fetchFoods();
   }, []);
 
-  // Delete a food row and its image (if any)
   const handleDelete = async (food: FoodRow) => {
     if (!food?.id) return;
     const confirmed = window.confirm("Delete this food item?");
@@ -77,10 +74,8 @@ export default function DashBoardPage() {
 
     setIsDeletingId(food.id);
     try {
-      // Remove image from storage if available
       if (food.food_image_url) {
         try {
-          // Extract path within bucket from the public URL
           let pathInBucket: string | null = null;
           try {
             const url = new URL(food.food_image_url);
@@ -91,7 +86,6 @@ export default function DashBoardPage() {
               );
             }
           } catch {
-            // Fallback: best-effort split
             const marker = "/Foodtb_bk/";
             const idx2 = food.food_image_url.indexOf(marker);
             if (idx2 >= 0) {
@@ -105,19 +99,15 @@ export default function DashBoardPage() {
             await supabase.storage.from("Foodtb_bk").remove([pathInBucket]);
           }
         } catch (imgErr) {
-          // Ignore image deletion failure; continue with row deletion
           console.warn("Image removal failed:", imgErr);
         }
       }
 
-      // Delete the row from table
       const { error } = await supabase
         .from("food_tb")
         .delete()
         .eq("id", food.id);
       if (error) throw error;
-
-      // Update local state
       setFoods((prev) => prev.filter((f) => f.id !== food.id));
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
@@ -127,7 +117,6 @@ export default function DashBoardPage() {
     }
   };
 
-  // Simple client-side search filter
   const filteredFoods = foods.filter((f) => {
     const term = searchTerm.trim().toLowerCase();
     if (!term) return true;
@@ -143,7 +132,7 @@ export default function DashBoardPage() {
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
-    setCurrentPage(1); // Reset to first page on new search
+    setCurrentPage(1);
   };
 
   const handlePageChange = (page: number) => {

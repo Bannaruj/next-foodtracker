@@ -33,7 +33,6 @@ export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // ดึงข้อมูลผู้ใช้ปัจจุบัน
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
@@ -48,7 +47,6 @@ export default function ProfilePage() {
         }
         console.log("User ID:", session.user.id);
 
-        // Try to get the row; fall back to creating one if not found
         console.log("Fetching user data for ID:", session.user.id);
         const selectResp = await supabase
           .from("user_tb")
@@ -61,13 +59,11 @@ export default function ProfilePage() {
         const selectError = selectResp.error;
 
         if (selectError && !userRow) {
-          // ถ้าไม่มี user record ให้สร้าง default profile แทนการ insert
           console.log("No user record found, creating default profile");
           const fullNameMeta =
             (session.user as { user_metadata?: { full_name?: string } })
               .user_metadata?.full_name ?? "";
 
-          // สร้าง default profile object แทนการ insert
           userRow = {
             id: session.user.id,
             email: session.user.email ?? "",
@@ -99,7 +95,6 @@ export default function ProfilePage() {
           error: err,
         });
 
-        // แสดง error ที่เฉพาะเจาะจงมากขึ้น
         let errorMessage = "Unknown error";
         if (err instanceof Error) {
           errorMessage = err.message;
@@ -148,9 +143,7 @@ export default function ProfilePage() {
     try {
       let newImageUrl = formData.profilePicture;
 
-      // อัปโหลดรูปภาพใหม่ถ้ามีการเลือกไฟล์ใหม่
       if (selectedFile) {
-        // ตรวจสอบขนาดไฟล์ (จำกัดที่ 5MB)
         if (selectedFile.size > 5 * 1024 * 1024) {
           throw new Error("File size must be less than 5MB");
         }
@@ -169,7 +162,6 @@ export default function ProfilePage() {
           );
         }
 
-        // ลบรูปภาพเก่าถ้ามี
         if (formData.profilePicture) {
           try {
             let pathInBucket: string | null = null;
@@ -199,7 +191,6 @@ export default function ProfilePage() {
           }
         }
 
-        // อัปโหลดรูปภาพใหม่
         const fileExt = selectedFile.name.split(".").pop();
         const fileName = `${Date.now()}.${fileExt}`;
         const filePath = `profile-images/${fileName}`;
@@ -212,7 +203,6 @@ export default function ProfilePage() {
           throw new Error(`Failed to upload image: ${uploadError.message}`);
         }
 
-        // ดึง URL ของรูปภาพใหม่
         const {
           data: { publicUrl },
         } = supabase.storage.from("Foodtb_bk").getPublicUrl(filePath);
@@ -220,7 +210,6 @@ export default function ProfilePage() {
         newImageUrl = publicUrl;
       }
 
-      // อัปเดตข้อมูลในฐานข้อมูล (ใช้ upsert เพื่อหลีกเลี่ยง RLS policy)
       const { error } = await supabase.from("user_tb").upsert({
         id: formData.id,
         fullname: formData.fullName,
@@ -233,7 +222,6 @@ export default function ProfilePage() {
 
       alert("Profile updated successfully!");
 
-      // อัปเดต state
       setFormData((prev) =>
         prev ? { ...prev, profilePicture: newImageUrl } : null
       );
